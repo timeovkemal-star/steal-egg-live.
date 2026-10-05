@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#090b14">
+
+<title>Steal An Egg — Live</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #090b14;
+    color: white;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Arial, sans-serif;
+}
+
+.app {
+    max-width: 600px;
+    margin: auto;
+    padding: 20px 16px 40px;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+h1 {
+    font-size: 27px;
+    margin: 0;
+}
+
+.status {
+    background: #12351e;
+    color: #55ff8a;
+    padding: 7px 11px;
+    border-radius: 20px;
+    font-size: 13px;
+}
+
+.card {
+    background: #131725;
+    border: 1px solid #252b40;
+    border-radius: 20px;
+    padding: 17px;
+    margin-bottom: 13px;
+}
+
+.latest {
+    border: 1px solid #6c42ff;
+    box-shadow: 0 0 25px #6c42ff33;
+}
+
+.label {
+    color: #9299ad;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.name {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 7px 0;
+}
+
+.info {
+    color: #aeb5c8;
+    font-size: 14px;
+    line-height: 1.7;
+}
+
+.badge {
+    display: inline-block;
+    padding: 5px 9px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    margin-top: 5px;
+}
+
+.secret {
+    background: #641d31;
+    color: #ff7898;
+}
+
+.eternal {
+    background: #3b2166;
+    color: #d49cff;
+}
+
+.divine {
+    background: #725819;
+    color: #ffe278;
+}
+
+.cosmic {
+    background: #193f65;
+    color: #70c9ff;
+}
+
+button {
+    width: 100%;
+    border: 0;
+    border-radius: 14px;
+    padding: 15px;
+    background: #6847ff;
+    color: white;
+    font-size: 16px;
+    font-weight: 700;
+    margin-top: 12px;
+}
+
+button:active {
+    transform: scale(0.98);
+}
+
+.row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.switch {
+    width: 48px;
+    height: 28px;
+    border-radius: 20px;
+    background: #33394b;
+    position: relative;
+}
+
+.switch.on {
+    background: #6847ff;
+}
+
+.switch:after {
+    content: "";
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    top: 3px;
+    left: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: 0.2s;
+}
+
+.switch.on:after {
+    left: 23px;
+}
+
+.empty {
+    text-align: center;
+    color: #8d94a8;
+    padding: 25px;
+}
+
+.history-item {
+    padding: 12px 0;
+    border-bottom: 1px solid #252b40;
+}
+
+.history-item:last-child {
+    border-bottom: none;
+}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+    <div class="header">
+        <h1>🥚 Steal An Egg</h1>
+        <div class="status" id="status">
+            Connexion…
+        </div>
+    </div>
+
+    <div class="card latest">
+
+        <div class="label">
+            Dernier spawn
+        </div>
+
+        <div id="latest">
+            Recherche des derniers eggs…
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <div class="row">
+
+            <div>
+                <b>🔔 Alertes</b><br>
+
+                <span class="info">
+                    Secret / Eternal / Divine
+                </span>
+            </div>
+
+            <div
+                class="switch on"
+                id="alertSwitch">
+            </div>
+
+        </div>
+
+        <button onclick="enableNotifications()">
+            🔔 Activer les notifications
+        </button>
+
+    </div>
+
+    <div class="card">
+
+        <div class="row">
+
+            <b>🔄 Actualisation</b>
+
+            <span id="countdown">
+                60 s
+            </span>
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <div class="label">
+            Historique
+        </div>
+
+        <div id="history">
+            <div class="empty">
+                Chargement…
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+
+<script>
+
+/*
+==================================================
+SOURCE DES DONNÉES
+==================================================
+
+IMPORTANT :
+
+Cette adresse est provisoire.
+
+Il faudra la remplacer par
+l'endpoint JSON réel de Steal An Egg.
+
+==================================================
+*/
+
+const API =
+"https://stealegg.com/api/live";
+
+
+/*
+==================================================
+RARETÉS À SURVEILLER
+==================================================
+*/
+
+const IMPORTANT = [
+    "Secret",
+    "Eternal",
+    "Divine"
+];
+
+
+let lastSeen =
+    localStorage.getItem("lastEgg");
+
+let alerts = true;
+
+let seconds = 60;
+
+
+/*
+==================================================
+COULEUR DE LA RARETÉ
+==================================================
+*/
+
+function rarityClass(rarity) {
+
+    if (!rarity)
+        return "";
+
+    const r =
+        rarity.toLowerCase();
+
+    if (r.includes("secret"))
+        return "secret";
+
+    if (r.includes("eternal"))
+        return "eternal";
+
+    if (r.includes("divine"))
+        return "divine";
+
+    if (r.includes("cosmic"))
+        return "cosmic";
+
+    return "";
+}
+
+
+/*
+==================================================
+AFFICHAGE D'UN EGG
+==================================================
+*/
+
+function showEgg(egg) {
+
+    const rarity =
+        egg.rarity || "Inconnue";
+
+    const pet =
+        egg.pet ||
+        egg.name ||
+        "Egg inconnu";
+
+    const biome =
+        egg.biome ||
+        "Biome inconnu";
+
+    const time =
+        egg.time ||
+        egg.spawnedAt ||
+        "";
+
+    return `
+
+        <div class="history-item">
+
+            <div class="name">
+                🥚 ${pet}
+            </div>
+
+            <span class="badge ${rarityClass(rarity)}">
+                ${rarity}
+            </span>
+
+            <div class="info">
+
+                📍 ${biome}
+
+                <br>
+
+                🕐 ${time}
+
+            </div>
+
+        </div>
+
+    `;
+}
+
+
+/*
+==================================================
+CHARGEMENT DES EGGS
+==================================================
+*/
+
+async function loadEggs() {
+
+    try {
+
+        const response =
+            await fetch(
+                API + "?t=" + Date.now(),
+                {
+                    cache: "no-store"
+                }
+            );
+
+        if (!response.ok)
+            throw new Error(
+                "Erreur API"
+            );
+
+
+        const data =
+            await response.json();
+
+
+        /*
+        Plusieurs formats JSON
+        sont acceptés.
+        */
+
+        let eggs =
+            Array.isArray(data)
+                ? data
+                : data.records ||
+                  data.spawns ||
+                  data.data ||
+                  [];
+
+
+        if (!Array.isArray(eggs))
+            eggs = [];
+
+
+        document
+            .getElementById("status")
+            .textContent =
+            "🟢 CONNECTÉ";
+
+
+        if (!eggs.length) {
+
+            document
+                .getElementById("latest")
+                .innerHTML =
+                "Aucun spawn disponible.";
+
+            return;
+        }
+
+
+        /*
+        Dernier egg
+        */
+
+        const latest =
+            eggs[0];
+
+
+        document
+            .getElementById("latest")
+            .innerHTML =
+            showEgg(latest);
+
+
+        /*
+        Historique
+        */
+
+        document
+            .getElementById("history")
+            .innerHTML =
+            eggs
+                .slice(0, 20)
+                .map(showEgg)
+                .join("");
+
+
+        /*
+        Identifiant unique
+        */
+
+        const id =
+            latest.id ||
+            latest.spawnId ||
+            JSON.stringify(latest);
+
+
+        /*
+        Nouveau spawn ?
+        */
+
+        if (
+            lastSeen &&
+            id !== lastSeen
+        ) {
+
+            const rarity =
+                String(
+                    latest.rarity || ""
+                );
+
+
+            /*
+            Notification uniquement
+            pour Secret / Eternal / Divine
+            */
+
+            if (
+                alerts &&
+                IMPORTANT.some(
+                    x =>
+                        rarity
+                            .toLowerCase()
+                            .includes(
+                                x.toLowerCase()
+                            )
+                )
+            ) {
+
+                notifyEgg(latest);
+
+            }
+
+        }
+
+
+        lastSeen = id;
+
+        localStorage.setItem(
+            "lastEgg",
+            id
+        );
+
+
+    } catch (error) {
+
+        console.error(error);
+
+        document
+            .getElementById("status")
+            .textContent =
+            "🟠 HORS LIGNE";
+
+    }
+
+}
+
+
+/*
+==================================================
+NOTIFICATION
+==================================================
+*/
+
+function notifyEgg(egg) {
+
+    const rarity =
+        egg.rarity || "Rare";
+
+    const pet =
+        egg.pet ||
+        egg.name ||
+        "Egg";
+
+
+    if (
+        Notification.permission ===
+        "granted"
+    ) {
+
+        new Notification(
+            "🥚 STEAL AN EGG",
+            {
+                body:
+                    `${rarity} détecté : ${pet}`
+            }
+        );
+
+    }
+
+}
+
+
+/*
+==================================================
+ACTIVER LES NOTIFICATIONS
+==================================================
+*/
+
+async function enableNotifications() {
+
+    if (
+        !("Notification" in window)
+    ) {
+
+        alert(
+            "Les notifications ne sont pas disponibles ici."
+        );
+
+        return;
+    }
+
+
+    const permission =
+        await Notification
+            .requestPermission();
+
+
+    if (
+        permission ===
+        "granted"
+    ) {
+
+        alerts = true;
+
+
+        document
+            .getElementById(
+                "alertSwitch"
+            )
+            .classList
+            .add("on");
+
+
+        new Notification(
+            "🥚 Steal An Egg",
+            {
+                body:
+                    "Alertes activées !"
+            }
+        );
+
+    }
+
+}
+
+
+/*
+==================================================
+BOUTON ALERTES
+==================================================
+*/
+
+document
+    .getElementById(
+        "alertSwitch"
+    )
+    .onclick =
+    function () {
+
+        alerts =
+            !alerts;
+
+        this.classList.toggle(
+            "on",
+            alerts
+        );
+
+    };
+
+
+/*
+==================================================
+PREMIER CHARGEMENT
+==================================================
+*/
+
+loadEggs();
+
+
+/*
+==================================================
+ACTUALISATION
+==================================================
+*/
+
+setInterval(
+    loadEggs,
+    60000
+);
+
+
+/*
+==================================================
+COMPTE À REBOURS
+==================================================
+*/
+
+setInterval(
+    () => {
+
+        seconds--;
+
+        if (seconds <= 0)
+            seconds = 60;
+
+        document
+            .getElementById(
+                "countdown"
+            )
+            .textContent =
+            seconds + " s";
+
+    },
+    1000
+);
+
+</script>
+
+</body>
+</html>
